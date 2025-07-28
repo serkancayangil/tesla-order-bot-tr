@@ -249,10 +249,6 @@
                 var pickupLocationsData = pickupLocationsDataResp.falconDeliveryLocations;
 
                 if (!Array.isArray(pickupLocationsData) || pickupLocationsData.length === 0) {
-                    return {
-                        error: `Araç için uygun teslimat noktası bulunamadı: ${vehicleData.VIN}`
-                    };
-                } else {
                     pickupLocationsData = [{
                             service_id: "410805",
                             title: "Tesla Ankara",
