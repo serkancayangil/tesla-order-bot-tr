@@ -246,18 +246,34 @@
                     });
 
                 const pickupLocationsDataResp = await pickupLocationsResponse.json();
-                const pickupLocationsData = pickupLocationsDataResp.falconDeliveryLocations;
+                var pickupLocationsData = pickupLocationsDataResp.falconDeliveryLocations;
 
                 if (!Array.isArray(pickupLocationsData) || pickupLocationsData.length === 0) {
                     return {
                         error: `Araç için uygun teslimat noktası bulunamadı: ${vehicleData.VIN}`
                     };
-                }
-
-                if (!Array.isArray(pickupLocationsData) || pickupLocationsData.length === 0) {
-                    return {
-                        error: `Araç için uygun teslimat noktası bulunamadı: ${vehicleData.VIN}`
-                    };
+                } else {
+                    pickupLocationsData = [{
+                            service_id: "410805",
+                            title: "Tesla Ankara",
+                            city: "Ankara",
+                            province: "Ankara",
+                            latitude: "39.9535097",
+                            longitude: "32.707103",
+                            trt_id: 410805,
+                            location_type: ["Delivery", "Service", "Store"],
+                        },
+                        {
+                            service_id: "410806",
+                            title: "Tesla İstanbul",
+                            city: "İstanbul",
+                            province: "İstanbul",
+                            latitude: "41.0082",
+                            longitude: "28.9784",
+                            trt_id: 410806,
+                            location_type: ["Delivery", "Service", "Store"],
+                        },
+                    ];
                 }
 
                 vehicleData.LOCS = pickupLocationsData.map(location => ({
