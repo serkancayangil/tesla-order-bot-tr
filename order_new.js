@@ -245,7 +245,14 @@
                         credentials: "include"
                     });
 
-                const pickupLocationsData = await pickupLocationsResponse.json();
+                const pickupLocationsDataResp = await pickupLocationsResponse.json();
+                const pickupLocationsData = pickupLocationsDataResp.falconDeliveryLocations;
+
+                if (!Array.isArray(pickupLocationsData) || pickupLocationsData.length === 0) {
+                    return {
+                        error: `Araç için uygun teslimat noktası bulunamadı: ${vehicleData.VIN}`
+                    };
+                }
 
                 if (!Array.isArray(pickupLocationsData) || pickupLocationsData.length === 0) {
                     return {
