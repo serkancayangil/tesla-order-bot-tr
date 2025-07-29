@@ -362,7 +362,7 @@
                                     AgreementSave: null,
                                     RedirectPaymentName: "CREDITCARD",
                                     IsOffline: true,
-                                    OrderAmount: 175000,
+                                    OrderAmount: 140000,
                                     PaymentSourceSubType: "DEPOSIT_NON_REFUNDABLE",
                                     LastFourDigits: null,
                                     isV3Payment: true
