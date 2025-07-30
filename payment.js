@@ -15,6 +15,8 @@ const city = "artuklu";
 const stateProvince = "mardin";
 const zipCode = "47100";
 
+const amount = "140000";
+
 ["https://static-assets-pay.tesla.com/api/script/adyen-cse.js?countryCode=TR", "https://static-assets-pay.tesla.com/api/script/adyen-df.js"].forEach(async (path) => {
     const {
         promise,
@@ -73,7 +75,7 @@ setTimeout(async () => {
             processWithProfile: false,
             signedData: TOKEN,
             paymentDetails: [{
-                amount: 175000,
+                amount,
                 currency: "TRY",
                 hostUrl: btoa(`https://www.tesla.com/tr_TR/modely/order/payment_done/${RN}/${VIN}`),
                 isMobile: false,
