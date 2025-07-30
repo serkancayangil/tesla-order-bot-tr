@@ -5,8 +5,11 @@
 
 Bu bot, **Chrome geliştirici konsolunda** çalışır.
 
-- `order_new.js`, **WebSocket** üzerinden **stok bilgisini dinler** ve **otomatik olarak siparişi oluşturur**.  
+- `order_new.js`, **WebSocket** üzerinden **stok bilgisini dinler** ve **otomatik olarak siparişi oluşturur**.
+- Bot, her 30 saniyede bir yeni sekme açar.
+Sipariş vermek isteyen kullanıcılar, ilk açılan sekmeden sipariş vermek istedikleri mail ile giriş yapmalı ve yeni sekme açılmasına izin vermelidir.
 - Ardından, `payment.js` ile **ödeme işlemi tamamlanabilir**.
+  
 
 > 📢 **Bu bot yalnızca eğitim amaçlıdır. Gerçek sipariş veremezsiniz.**
 
@@ -16,7 +19,9 @@ Bu bot, **Chrome geliştirici konsolunda** çalışır.
 
 This bot runs in the **Chrome developer console**.
 
-- `order_new.js` listens to **stock data via WebSocket** and **automatically places the order**.  
+- `order_new.js` listens to **stock data via WebSocket** and **automatically places the order**.
+- The bot opens a new tab every 30 seconds.
+Users who want to place an order should log in from the first opened tab using the email address they want to order with and allow the opening of new tabs.
 - Then, `payment.js` can be used to **complete the payment**.
 
 > 📢 **This bot is for educational purposes only. You cannot place real orders with it.**
