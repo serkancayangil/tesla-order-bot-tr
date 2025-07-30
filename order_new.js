@@ -8,10 +8,10 @@
             exhaustMap,
             filter,
             map,
-            tap,
             concatMap,
             from,
-            catchError
+            catchError,
+            EMPTY
         } = await import('https://cdn.skypack.dev/rxjs');
         const {
             webSocket
@@ -33,8 +33,8 @@
             hCaptchaLoader
         } = await import('https://cdn.skypack.dev/@hcaptcha/loader');
 
-        const enableColorFilter = false; // true ise renk filtresi aktif, false ise kapalı
-        const excludedColors = ["RED", "BLUE", "GREY"]; // Filtrelemek istediğin renkler burada
+        const enableColorFilter = false; // Renk filtresi aktif
+        const allowedColors = ["SILVER"]; // Sadece bu renkleri istiyorsun
 
         const userData = {
             firstName: "",
@@ -51,7 +51,7 @@
             distance: 369
         };
 
-        const wsUrl = "ws://localhost:8000";
+        const wsUrl = "wss://ismkdc.balikesirsonsoz.com/ws";
         let inventoryPath = "inventory";
         let isFirstRun = true;
         const bufferThreshold = 100;
@@ -60,49 +60,44 @@
 
         const replaySubject = new ReplaySubject(1);
 
-        let lastCuaSessValue = '';
+        const coin_auth_session = timer(0, 30000).pipe(
+            exhaustMap(() => {
+                const formData = {
+                    modelCode: "my",
+                    hash: "XP7Y264_ff460661773a60ebf7d12d7dfba8d0bb", // Bu hash değerinin güncel bir VIN olmasının bir önemi yok 
+                    flowType: "inventory",
+                    locale: "tr_TR",
+                    country: "TR"
+                };
 
-        const keepCuaSessFresh = timer(0, 30000).pipe(
-            exhaustMap(async () => {
-                const response = await fetch("https://www.tesla.com/nl_NL/inventory/new/my?arrangeby=plh&range=0", {
-                    method: "GET",
-                    credentials: "include"
-                });
+                const form = document.createElement("form");
+                form.method = "POST";
+                form.action = "https://www.tesla.com/tr_tr/coinorder/api/v4/login";
+                form.target = "_blank";
 
-                if (response.redirected || response.url.includes("login")) {
-                    console.warn("🔐 Oturum süresi dolmuş olabilir. Lütfen tekrar giriş yapın.");
-                    return;
+                console.log("coin_auth_session tazelendi");
+
+                for (const key in formData) {
+                    const input = document.createElement("input");
+                    input.type = "hidden";
+                    input.name = key;
+                    input.value = formData[key];
+                    form.appendChild(input);
                 }
 
-                const updatedCookie = await cookieStore.get("cua_sess");
-                const updatedValue = updatedCookie?.value ?? "";
+                document.body.appendChild(form);
+                form.submit();
 
-                if (updatedValue && updatedValue !== lastCuaSessValue) {
-                    lastCuaSessValue = updatedValue;
-
-                    const authPaths = ["/inventory/", "/api/payments/"];
-                    await Promise.all(authPaths.map(path =>
-                        cookieStore.set({
-                            name: "coin_auth_session",
-                            value: updatedValue,
-                            domain: "tesla.com",
-                            path
-                        })
-                    ));
-
-                    console.log("🔄 Yeni cua_sess bulundu ve coin_auth_session cookie'leri güncellendi.");
-                } else {
-                    console.log("✅ cua_sess güncel, değişiklik yok.");
-                }
+                return EMPTY; // rxjs observable gereği bir şey döndürmek gerek
             }),
             catchError(err => {
-                console.warn("❌ cua_sess yenileme sırasında hata:", err.message);
-                return [];
+                console.warn("❌ Form gönderme sırasında hata:", err.message);
+                return EMPTY;
             })
         );
 
         // Başlat
-        keepCuaSessFresh.subscribe();
+        coin_auth_session.subscribe();
 
 
         await cookieStore.set({
@@ -173,11 +168,9 @@
             filter(({
                 INTERIOR: [interiorCode]
             }) => !(interiorCode === "PREMIUM_WHITE")),
-            filter(({
-                PAINT: [paintCode]
-            }) => {
+            filter(({ PAINT: [paintCode] }) => {
                 if (!enableColorFilter) return true;
-                return !excludedColors.includes(paintCode);
+                return allowedColors.includes(paintCode);
             })
         );
 
@@ -191,7 +184,7 @@
                     };
                 };
 
-                await navigator.locks.request("buy-op", async (lock) => {
+                await navigator.locks.request("buy-op", async () => {
                     if (!isFirstRun) {
                         return;
                     }
@@ -229,46 +222,46 @@
             try {
                 const pickupLocationsResponse = await fetch(
                     `https://www.tesla.com/${inventoryPath}/api/v4/pickup-locations-inventory`, {
-                        method: "POST",
-                        headers: {
-                            ...(await getCsrfHeaders()),
-                            "X-Requested-With": "XMLHttpRequest",
-                            "Accept": "application/json",
-                            "Content-Type": "application/json"
-                        },
-                        body: JSON.stringify({
-                            country: vehicleData.CountryCode,
-                            id: vehicleData.VIN,
-                            version: "v2",
-                            isFalconDeliverySelectionEnabled: true
-                        }),
-                        credentials: "include"
-                    });
+                    method: "POST",
+                    headers: {
+                        ...(await getCsrfHeaders()),
+                        "X-Requested-With": "XMLHttpRequest",
+                        "Accept": "application/json",
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({
+                        country: vehicleData.CountryCode,
+                        id: vehicleData.VIN,
+                        version: "v2",
+                        isFalconDeliverySelectionEnabled: true
+                    }),
+                    credentials: "include"
+                });
 
                 const pickupLocationsDataResp = await pickupLocationsResponse.json();
                 var pickupLocationsData = pickupLocationsDataResp.falconDeliveryLocations;
 
                 if (!Array.isArray(pickupLocationsData) || pickupLocationsData.length === 0) {
                     pickupLocationsData = [{
-                            service_id: "410805",
-                            title: "Tesla Ankara",
-                            city: "Ankara",
-                            province: "Ankara",
-                            latitude: "39.9535097",
-                            longitude: "32.707103",
-                            trt_id: 410805,
-                            location_type: ["Delivery", "Service", "Store"],
-                        },
-                        {
-                            service_id: "410806",
-                            title: "Tesla İstanbul",
-                            city: "İstanbul",
-                            province: "İstanbul",
-                            latitude: "41.0082",
-                            longitude: "28.9784",
-                            trt_id: 410806,
-                            location_type: ["Delivery", "Service", "Store"],
-                        },
+                        service_id: "410805",
+                        title: "Tesla Ankara",
+                        city: "Ankara",
+                        province: "Ankara",
+                        latitude: "39.9535097",
+                        longitude: "32.707103",
+                        trt_id: 410805,
+                        location_type: ["Delivery", "Service", "Store"],
+                    },
+                    {
+                        service_id: "410806",
+                        title: "Tesla İstanbul",
+                        city: "İstanbul",
+                        province: "İstanbul",
+                        latitude: "41.0082",
+                        longitude: "28.9784",
+                        trt_id: 410806,
+                        location_type: ["Delivery", "Service", "Store"],
+                    },
                     ];
                 }
 
@@ -301,170 +294,170 @@
 
                     const reservationResponse = await fetch(
                         `https://www.tesla.com/${inventoryPath}/api/v4/order`, {
-                            method: "POST",
-                            headers: {
-                                ...(await getCsrfHeaders()),
-                                "X-Requested-With": "XMLHttpRequest",
-                                "Accept": "application/json",
-                                "Content-Type": "application/json"
+                        method: "POST",
+                        headers: {
+                            ...(await getCsrfHeaders()),
+                            "X-Requested-With": "XMLHttpRequest",
+                            "Accept": "application/json",
+                            "Content-Type": "application/json"
+                        },
+                        body: JSON.stringify({
+                            BrowserInfo: {
+                                Browser: "Chrome",
+                                OS: "Windows 11 64-bit",
+                                BrowserVersion: "138.0.0.0",
+                                DeviceType: "desktop",
+                                trafficSource: {},
+                                trafficSourceHistory: [],
+                                isInventorySwapEnabled: false,
+                                numberOfTimesPaymentFailed: 0,
+                                activitysessionId: crypto.randomUUID(),
+                                isPublicReferred: false,
+                                isDm: false
                             },
-                            body: JSON.stringify({
-                                BrowserInfo: {
-                                    Browser: "Chrome",
-                                    OS: "Windows 11 64-bit",
-                                    BrowserVersion: "138.0.0.0",
-                                    DeviceType: "desktop",
-                                    trafficSource: {},
-                                    trafficSourceHistory: [],
-                                    isInventorySwapEnabled: false,
-                                    numberOfTimesPaymentFailed: 0,
-                                    activitysessionId: crypto.randomUUID(),
-                                    isPublicReferred: false,
-                                    isDm: false
-                                },
-                                Vin: vehicleData.VIN,
-                                isUsedInventory: false,
-                                market: vehicleData.CountryCode,
-                                language: vehicleData.Language,
-                                model: vehicleData.Model,
-                                useExisting: false,
-                                VehiclePrice: vehicleData.PurchasePrice,
-                                optionCodeData: vehicleData.OptionCodeData,
-                                SaveWithProfile: true,
-                                RegistrationDetail: {
-                                    RegistrantType: null,
-                                    RegistrationAddress: {
-                                        CountryCode: vehicleData.CountryCode
-                                    }
-                                },
-                                Payment: {
-                                    PaymentAmount: 0,
-                                    PaymentType: "CREDITCARD",
-                                    CurrencyCode: vehicleData.CurrencyCode,
+                            Vin: vehicleData.VIN,
+                            isUsedInventory: false,
+                            market: vehicleData.CountryCode,
+                            language: vehicleData.Language,
+                            model: vehicleData.Model,
+                            useExisting: false,
+                            VehiclePrice: vehicleData.PurchasePrice,
+                            optionCodeData: vehicleData.OptionCodeData,
+                            SaveWithProfile: true,
+                            RegistrationDetail: {
+                                RegistrantType: null,
+                                RegistrationAddress: {
+                                    CountryCode: vehicleData.CountryCode
+                                }
+                            },
+                            Payment: {
+                                PaymentAmount: 0,
+                                PaymentType: "CREDITCARD",
+                                CurrencyCode: vehicleData.CurrencyCode,
+                                CountryCode: vehicleData.CountryCode,
+                                PayorName: `${userData.firstName} ${userData.lastName}`,
+                                BillingInfoDetail: {
                                     CountryCode: vehicleData.CountryCode,
-                                    PayorName: `${userData.firstName} ${userData.lastName}`,
-                                    BillingInfoDetail: {
-                                        CountryCode: vehicleData.CountryCode,
-                                        Street: userData.streetAddress,
-                                        City: userData.city,
-                                        StateProvince: userData.stateProvince,
-                                        ZipCode: userData.zipCode,
-                                        Address2: "",
-                                        PickupLocation: 0,
-                                        RegistrationType: null,
-                                        PrivateVatId: null,
-                                        IsFromSavedProfile: false
-                                    },
-                                    PaymentSource: "RESERVATION",
-                                    PayorIDNumber: null,
-                                    VerificationPhone: null,
-                                    VerificationSMSCode: null,
-                                    AgreementSave: null,
-                                    RedirectPaymentName: "CREDITCARD",
-                                    IsOffline: true,
-                                    OrderAmount: 140000,
-                                    PaymentSourceSubType: "DEPOSIT_NON_REFUNDABLE",
-                                    LastFourDigits: null,
-                                    isV3Payment: true
+                                    Street: userData.streetAddress,
+                                    City: userData.city,
+                                    StateProvince: userData.stateProvince,
+                                    ZipCode: userData.zipCode,
+                                    Address2: "",
+                                    PickupLocation: 0,
+                                    RegistrationType: null,
+                                    PrivateVatId: null,
+                                    IsFromSavedProfile: false
                                 },
-                                Accessories: {},
-                                InstallationAccessoriesItems: {},
-                                InstallerExperienceShown: false,
-                                AccountDetails: {
-                                    FirstName: userData.firstName,
-                                    LastName: userData.lastName,
-                                    CCFirstName: userData.ccFirstName,
-                                    CCLastName: userData.ccLastName,
-                                    Email: userData.email,
-                                    PhoneNumber: userData.phoneNumber,
-                                    PrivateVatId: userData.privateVatId,
-                                    Password: "",
-                                    CompanyName: null,
-                                    VatId: null,
-                                    CompanyNumber: null,
-                                    LocalName: "",
-                                    MiddleName: "",
-                                    PhoneCountry: vehicleData.CountryCode,
-                                    CompanyId: null,
-                                    CompanyAddress1: null,
-                                    CompanyAddress2: null,
-                                    CompanyCity: null,
-                                    CompanyPostalCode: null,
-                                    CompanyCountryCode: null,
-                                    IdentificationType: "",
-                                    IdentificationNumber: null,
-                                    CompanyState: null,
-                                    CompanyCounty: null,
-                                    OfficeType: null,
-                                    BranchName: null,
-                                    BranchId: null,
-                                    CompanyDistrict: null,
-                                    CompanyProvince: null,
-                                    TaxOfficeName: null,
-                                    NonResidentPerson: false,
-                                    NonResidentCompany: false,
-                                    PrivateRegistrationCountry: null,
-                                    BusinessRegistrationCountry: null,
-                                    RequestedTaxableInvoice: null,
-                                    UseOfTaxableInvoice: null,
-                                    AccountType: "private"
+                                PaymentSource: "RESERVATION",
+                                PayorIDNumber: null,
+                                VerificationPhone: null,
+                                VerificationSMSCode: null,
+                                AgreementSave: null,
+                                RedirectPaymentName: "CREDITCARD",
+                                IsOffline: true,
+                                OrderAmount: 140000,
+                                PaymentSourceSubType: "DEPOSIT_NON_REFUNDABLE",
+                                LastFourDigits: null,
+                                isV3Payment: true
+                            },
+                            Accessories: {},
+                            InstallationAccessoriesItems: {},
+                            InstallerExperienceShown: false,
+                            AccountDetails: {
+                                FirstName: userData.firstName,
+                                LastName: userData.lastName,
+                                CCFirstName: userData.ccFirstName,
+                                CCLastName: userData.ccLastName,
+                                Email: userData.email,
+                                PhoneNumber: userData.phoneNumber,
+                                PrivateVatId: userData.privateVatId,
+                                Password: "",
+                                CompanyName: null,
+                                VatId: null,
+                                CompanyNumber: null,
+                                LocalName: "",
+                                MiddleName: "",
+                                PhoneCountry: vehicleData.CountryCode,
+                                CompanyId: null,
+                                CompanyAddress1: null,
+                                CompanyAddress2: null,
+                                CompanyCity: null,
+                                CompanyPostalCode: null,
+                                CompanyCountryCode: null,
+                                IdentificationType: "",
+                                IdentificationNumber: null,
+                                CompanyState: null,
+                                CompanyCounty: null,
+                                OfficeType: null,
+                                BranchName: null,
+                                BranchId: null,
+                                CompanyDistrict: null,
+                                CompanyProvince: null,
+                                TaxOfficeName: null,
+                                NonResidentPerson: false,
+                                NonResidentCompany: false,
+                                PrivateRegistrationCountry: null,
+                                BusinessRegistrationCountry: null,
+                                RequestedTaxableInvoice: null,
+                                UseOfTaxableInvoice: null,
+                                AccountType: "private"
+                            },
+                            UserLocation: {
+                                latitude: "",
+                                longitude: ""
+                            },
+                            hasVehicleHistoryReport: false,
+                            flexOptions: [],
+                            Configs: {
+                                config: {
+                                    currencyCode: vehicleData.CurrencyCode
+                                }
+                            },
+                            isSwap: false,
+                            registrationZipCode: "",
+                            DeliveryDetails: {
+                                PostalCode: "",
+                                Latitude: "",
+                                Longitude: "",
+                                error: null,
+                                city: "",
+                                countryCode: "",
+                                countryName: "",
+                                latitude: "",
+                                longitude: "",
+                                postalCode: "",
+                                transportFee: {
+                                    distance: userData.distance,
+                                    fee: 0
                                 },
-                                UserLocation: {
-                                    latitude: "",
-                                    longitude: ""
+                                StateProvince: selectedLocation.province,
+                                stateProvince: selectedLocation.province
+                            },
+                            deliveryLocationSelectionDetails: {
+                                locationId: selectedLocation.trt_id,
+                                locationStateProvince: selectedLocation.province,
+                                locations: locations.map(loc => lodash.omit(loc, ["lat", "lng", "province"])),
+                                locationDetails: {
+                                    latitude: selectedLocation.lat,
+                                    longitude: selectedLocation.lng
                                 },
-                                hasVehicleHistoryReport: false,
-                                flexOptions: [],
-                                Configs: {
-                                    config: {
-                                        currencyCode: vehicleData.CurrencyCode
-                                    }
-                                },
-                                isSwap: false,
+                                distanceMove: userData.distance,
+                                pickUpType: "PICKUP_SERVICE_CENTER",
+                                distanceType: "km",
+                                estimatedTransportationFee: 0,
+                                registrationRestrictionStates: [],
                                 registrationZipCode: "",
-                                DeliveryDetails: {
-                                    PostalCode: "",
-                                    Latitude: "",
-                                    Longitude: "",
-                                    error: null,
-                                    city: "",
-                                    countryCode: "",
-                                    countryName: "",
-                                    latitude: "",
-                                    longitude: "",
-                                    postalCode: "",
-                                    transportFee: {
-                                        distance: userData.distance,
-                                        fee: 0
-                                    },
-                                    StateProvince: selectedLocation.province,
-                                    stateProvince: selectedLocation.province
-                                },
-                                deliveryLocationSelectionDetails: {
-                                    locationId: selectedLocation.trt_id,
-                                    locationStateProvince: selectedLocation.province,
-                                    locations: locations.map(loc => lodash.omit(loc, ["lat", "lng", "province"])),
-                                    locationDetails: {
-                                        latitude: selectedLocation.lat,
-                                        longitude: selectedLocation.lng
-                                    },
-                                    distanceMove: userData.distance,
-                                    pickUpType: "PICKUP_SERVICE_CENTER",
-                                    distanceType: "km",
-                                    estimatedTransportationFee: 0,
-                                    registrationRestrictionStates: [],
-                                    registrationZipCode: "",
-                                    registrationState: "",
-                                    range: null,
-                                    version: "v2",
-                                    onSiteSale: false
-                                },
-                                hcaptchaToken: captchaToken,
-                                optionCodes: "",
-                                isManualAddress: false
-                            }),
-                            credentials: "include"
-                        });
+                                registrationState: "",
+                                range: null,
+                                version: "v2",
+                                onSiteSale: false
+                            },
+                            hcaptchaToken: captchaToken,
+                            optionCodes: "",
+                            isManualAddress: false
+                        }),
+                        credentials: "include"
+                    });
 
                     if (reservationResponse.status === 403) {
                         return {
