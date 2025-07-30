@@ -27,6 +27,6 @@ Users who want to place an order should log in from the first opened tab using t
 > 📢 **This bot is for educational purposes only. You cannot place real orders with it.**
 
 Projeye destek olmak isteyenler için => TR03 0011 1000 0000 0055 7011 52 - ismail kundakcı  
-For those who wish to support the project => TR03 0011 1000 0000 0055 7011 52 - Ismail Kundakcı
+For those who wish to support the project => TR03 0011 1000 0000 0055 7011 52 - ismail kundakci
 
 🙏 Special thanks to **@erknkaya** for deobfuscation
